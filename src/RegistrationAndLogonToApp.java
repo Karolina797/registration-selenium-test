@@ -15,9 +15,10 @@ public class RegistrationAndLogonToApp{
     WebDriver driver = new ChromeDriver();
     WebDriverWait w = new WebDriverWait(driver, 5);
     private final static String EMAIL_URL = "email url";
-    private final static String ASSERTION_AFTER_REGISTRATION = "Konto zostało utworzone\n" +
+    private final static String AFTER_REGISTRATION_TEXT = "Konto zostało utworzone\n" +
             "Za chwilę na podany adres e-mail otrzymasz wiadomość z linkiem aktywacyjnym. Kliknij w niego aby móc korzystać z konta.\n";
-    private final static String ASSERTION_AFTER_ACTIVATION = "×\nTwoje konto zostało zaktywowane, możesz się teraz zalogować.";
+    private final static String AFTER_ACTIVATION_TEXT = "×\nTwoje konto zostało zaktywowane, możesz się teraz zalogować.";
+    private final static String AFTER_LOGOUT_TEXT = "×\nZostałeś(-aś) wylogowany(-a).";
 
 
     @Test
@@ -27,7 +28,7 @@ public class RegistrationAndLogonToApp{
         final String surname = "Xxxxx";
         final String email = "Xxxxxxxx@xxxx.com";
         final String password = "XxxxxX";
-        final String assertionGroups = "Xxxx, xxxxxxx,xxxxxx";
+        final String mainViewHeaderText = "Xxxx, xxxxxxx,xxxxxx";
 
         driver.get("application URL");
 
@@ -44,17 +45,14 @@ public class RegistrationAndLogonToApp{
         driver.findElement(By.cssSelector("input#gdprMessage")).click();
         driver.findElement(By.cssSelector("button[type='submit']")).click();
 
-        Assertions.assertTrue(driver.findElement(By.cssSelector("div[class='card-body']")).isDisplayed());
-        Assertions.assertEquals(ASSERTION_AFTER_REGISTRATION,driver.findElement(By.cssSelector("div[class='card-body']")).getText());
-
-        logToMail(email, password);
-        switchToTab(2);
-
-        Assertions.assertTrue(driver.findElement(By.cssSelector("div[class='alert alert-success alert-dismissible']")).isDisplayed());
-        Assertions.assertEquals(ASSERTION_AFTER_ACTIVATION,driver.findElement(By.cssSelector("div[class='alert alert-success alert-dismissible']")).getText());
-
-        logToApplication(email, password, assertionGroups, name, surname);
+        assertRegistrationInfo();
+        logToMailAndClickVerificationLink(email, password);
+        switchToTab(2); //registration link opens in new background tab
+        assertAccountActivationInfo();
+        logToApplication(email, password);
+        assertBeingLogged(mainViewHeaderText, name, surname);
         driver.findElement(By.cssSelector("a[href='/logout']")).click();
+        assertSuccessfulLogout();
     }
 
     @Test
@@ -65,7 +63,7 @@ public class RegistrationAndLogonToApp{
         final String email = "XxxxxX@xxxx.com";
         final String password = "XxxXXxxx";
         final String contactInfo = "Xxxxxx, xxxxx, xxxx";
-        final String assertionGroups = "Xxxx, xxxxxxx, xxxxxx";
+        final String mainViewHeaderText = "Xxxx, xxxxxxx, xxxxxx";
 
         driver.get("application URL");
 
@@ -84,24 +82,19 @@ public class RegistrationAndLogonToApp{
         driver.findElement(By.cssSelector("input#gdprMessage")).click();
         driver.findElement(By.cssSelector("button[type='submit']")).click();
 
-        Assertions.assertTrue(driver.findElement(By.cssSelector("div[class='card-body']")).isDisplayed());
-        Assertions.assertEquals(ASSERTION_AFTER_REGISTRATION,driver.findElement(By.cssSelector("div[class='card-body']")).getText());
-
-        logToMail(email, password);
-        switchToTab(2);
-
-        Assertions.assertTrue(driver.findElement(By.cssSelector("div[class='alert alert-success alert-dismissible']")).isDisplayed());
-        Assertions.assertEquals(ASSERTION_AFTER_ACTIVATION,driver.findElement(By.cssSelector("div[class='alert alert-success alert-dismissible']")).getText());
-
-        logToApplication(email, password, assertionGroups,name, surname);
+        assertRegistrationInfo();
+        logToMailAndClickVerificationLink(email, password);
+        switchToTab(2); //registration link opens in new background tab
+        assertAccountActivationInfo();
+        logToApplication(email, password);
+        assertBeingLogged(mainViewHeaderText, name, surname);
         driver.findElement(By.cssSelector("a[href='/logout']")).click();
+        assertSuccessfulLogout();
     }
 
 
 
-    public void logToMail(String emailAddress, String password) {
-
-        WebDriverWait w = new WebDriverWait(driver, 5);
+    public void logToMailAndClickVerificationLink(String emailAddress, String password) {
 
         driver.get(EMAIL_URL);
         w.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector("input#username")));
@@ -112,11 +105,19 @@ public class RegistrationAndLogonToApp{
         driver.findElement(By.cssSelector("div[class='row top']")).click();
         w.until(ExpectedConditions.elementToBeClickable(By.xpath("//a[contains(text(),'register')]")));
         driver.findElement(By.xpath("//a[contains(text(),'register')]")).click();
+        // after clicking we delete message
+        driver.findElement(By.cssSelector("button.pm_buttons-child.fa.fa-trash-o.toolbar-btn-trash.moveElement-btn-trash")).click();
+        driver.findElement(By.xpath("//span[text()='Kosz']")).click();
+        driver.findElement(By.cssSelector("div[class='row top']")).click();
+        driver.findElement(By.cssSelector("button[data-action='delete']")).click();
+        w.until(ExpectedConditions.elementToBeClickable(By.cssSelector("button#confirmModalBtn")));
+        driver.findElement(By.cssSelector("button#confirmModalBtn")).click();
     }
 
 
     public void switchToTab(int tabNumber) {
 
+        w.until(ExpectedConditions.numberOfWindowsToBe(tabNumber));
         Set<String> ids = driver.getWindowHandles();
         Iterator<String> it = ids.iterator();
         for (int i = 0; i < tabNumber - 1; i++) {
@@ -125,17 +126,36 @@ public class RegistrationAndLogonToApp{
         driver.switchTo().window(it.next());
     }
 
-    public void logToApplication(String email, String password, String assertionGroups, String name, String surname) {
+    public void logToApplication(String email, String password) {
 
         driver.findElement(By.cssSelector("input#email")).sendKeys(email);
         driver.findElement(By.cssSelector("input#password")).sendKeys(password);
         driver.findElement(By.cssSelector("button[type='submit']")).click();
+    }
+
+    public void assertBeingLogged(String mainViewHeaderText, String name, String surname) {
 
         Assertions.assertTrue(driver.findElement(By.cssSelector("h2[class='text-primary']")).isDisplayed());
-        Assertions.assertEquals(assertionGroups,driver.findElement(By.cssSelector("h2[class='text-primary']")).getText());
-
+        Assertions.assertEquals(mainViewHeaderText, driver.findElement(By.cssSelector("h2[class='text-primary']")).getText());
         Assertions.assertTrue(driver.findElement(By.cssSelector("span[class='my-auto']")).isDisplayed());
-        Assertions.assertTrue(Pattern.matches("(.)*"+ name + " " + surname, driver.findElement(By.cssSelector("span[class='my-auto']")).getText()));
+        Assertions.assertTrue(Pattern.matches("(.)*" + name + " " + surname, driver.findElement(By.cssSelector("span[class='my-auto']")).getText()));
+    }
 
+    public void assertSuccessfulLogout() {
+
+        Assertions.assertTrue(driver.findElement(By.cssSelector("div.alert.alert-success.alert-dismissible")).isDisplayed());
+        Assertions.assertEquals(AFTER_LOGOUT_TEXT, driver.findElement(By.cssSelector("div.alert.alert-success.alert-dismissible")).getText());
+    }
+
+    public void assertAccountActivationInfo() {
+
+        Assertions.assertTrue(driver.findElement(By.cssSelector("div[class='alert alert-success alert-dismissible']")).isDisplayed());
+        Assertions.assertEquals(AFTER_ACTIVATION_TEXT, driver.findElement(By.cssSelector("div[class='alert alert-success alert-dismissible']")).getText());
+    }
+
+    public void assertRegistrationInfo() {
+
+        Assertions.assertTrue(driver.findElement(By.cssSelector("div[class='card-body']")).isDisplayed());
+        Assertions.assertEquals(AFTER_REGISTRATION_TEXT, driver.findElement(By.cssSelector("div[class='card-body']")).getText());
     }
 }
